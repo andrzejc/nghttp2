@@ -95,6 +95,14 @@ int nghttp2_inet_pton(int af, const char *src, void *dst) {
   return 0;
 #  endif
 }
+
+struct tm *gmtime_r(const time_t *timep, struct tm *result) {
+  return gmtime_s(result, timep) != 0 ? nullptr : result;
+}
+
+struct tm *localtime_r(const time_t *timep, struct tm *result) {
+  return localtime_s(result, timep) != 0 ? nullptr : result;
+}
 } // namespace
 #endif // _WIN32
 
@@ -438,25 +446,31 @@ char *iso8601_basic_date(char *res, int64_t ms) {
 }
 
 #ifdef _WIN32
+namespace {
 namespace bt = boost::posix_time;
-// one-time definition of the locale that is used to parse UTC strings
-// (note that the time_input_facet is ref-counted and deleted automatically)
-static const std::locale
-    ptime_locale(std::locale::classic(),
-                 new bt::time_input_facet("%a, %d %b %Y %H:%M:%S GMT"));
-#endif //_WIN32
 
-time_t parse_http_date(const StringRef &s) {
-#ifdef _WIN32
+time_t parse_date(const StringRef& s, const std::locale& loc) {
   // there is no strptime - use boost
   std::stringstream sstr(s.str());
-  sstr.imbue(ptime_locale);
+  sstr.imbue(loc);
   bt::ptime ltime;
   sstr >> ltime;
   if (!sstr)
     return 0;
 
-  return boost::posix_time::to_time_t(ltime);
+  return bt::to_time_t(ltime);
+}
+}
+#endif //_WIN32
+
+time_t parse_http_date(const StringRef &s) {
+#ifdef _WIN32
+  // one-time definition of the locale that is used to parse UTC strings
+  // (note that the time_input_facet is ref-counted and deleted automatically)
+  static const std::locale
+      http_date_locale(std::locale::classic(),
+                  new bt::time_input_facet("%a, %d %b %Y %H:%M:%S GMT"));
+  return parse_date(s, http_date_locale);
 #else  // !_WIN32
   tm tm{};
   char *r = strptime(s.c_str(), "%a, %d %b %Y %H:%M:%S GMT", &tm);
@@ -468,12 +482,19 @@ time_t parse_http_date(const StringRef &s) {
 }
 
 time_t parse_openssl_asn1_time_print(const StringRef &s) {
+#ifdef _WIN32
+  static const std::locale
+      openssl_asn1_locale(std::locale::classic(),
+                 new bt::time_input_facet("%b %d %H:%M:%S %Y GMT"));
+  return parse_date(s, openssl_asn1_locale);
+#else  // !_WIN32
   tm tm{};
   auto r = strptime(s.c_str(), "%b %d %H:%M:%S %Y GMT", &tm);
   if (r == nullptr) {
     return 0;
   }
   return nghttp2_timegm_without_yday(&tm);
+#endif // !_WIN32
 }
 
 char upcase(char c) {
@@ -1683,9 +1704,11 @@ int daemonize(int nochdir, int noclose) {
     }
   }
   return 0;
-#else  // !__APPLE__
+#elif defined(_WIN32)
+  return -1;  // there's no fork on windows, just fail
+#else  // !__APPLE__ && !_WIN32
   return daemon(nochdir, noclose);
-#endif // !__APPLE__
+#endif // !__APPLE__ && !_WIN32
 }
 
 #ifdef ENABLE_HTTP3
