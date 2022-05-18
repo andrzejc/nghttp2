@@ -236,7 +236,7 @@ if [test "x$request_lib_only" = "xyes"]; then
   request_zlib=no
   request_libevent_openssl=no
   request_libcares=no
-  request_openssl=no
+  # NOTE we should still allow checking for openssl, it's required by ASIO lib
   request_libev=no
   request_jemalloc=no
   request_systemd=no
@@ -349,9 +349,26 @@ thread_local int a = 0;
     [have_Thread_local=no
      AC_MSG_RESULT([no])])
 
+# Check that getopt.h is available.
+AC_MSG_CHECKING([for getopt.h])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+[[
+#include <getopt.h>
+]],
+[[
+char* foo = "foo";
+getopt(1, &foo, "h");
+]])],
+    [have_getopt_h=yes
+     AC_MSG_RESULT([yes])],
+    [have_getopt_h=no
+     AC_MSG_RESULT([no])])
+
 CXXFLAGS=$save_CXXFLAGS
 
 AC_LANG_POP()
+
+AM_CONDITIONAL([USE_WINGETOPT], [ test "x${have_getopt_h}" = "xno" ])
 
 # Checks for libraries.
 

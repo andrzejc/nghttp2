@@ -56,6 +56,10 @@ AM_CPPFLAGS = \
 	@ZLIB_CFLAGS@ \
 	@EXTRA_DEFS@ \
 	@DEFS@
+if USE_WINGETOPT
+AM_CPPFLAGS += -I$(top_srcdir)/third-party/wingetopt/src
+endif # USE_WINGETOPT
+
 AM_LDFLAGS = @LIBTOOL_LDFLAGS@
 
 LDADD = $(top_builddir)/lib/libnghttp2.la \
@@ -85,6 +89,11 @@ HELPER_OBJECTS = util.cc \
 HELPER_HFILES = util.h \
 	http2.h timegm.h app_helper.h nghttp2_config.h \
 	nghttp2_gzip.h network.h
+
+if USE_WINGETOPT
+HELPER_OBJECTS += ../third-party/wingetopt/src/getopt.c
+HELPER_HFILES += ../third-party/wingetopt/src/getopt.h
+endif # USE_WINGETOPT
 
 HTML_PARSER_OBJECTS =
 HTML_PARSER_HFILES = HtmlParser.h
@@ -117,6 +126,10 @@ h2load_SOURCES += \
 	h2load_quic.cc h2load_quic.h \
 	quic.cc quic.h
 endif # ENABLE_HTTP3
+
+if USE_WINGETOPT
+h2load_SOURCES += ../third-party/wingetopt/src/getopt.c ../third-party/wingetopt/src/getopt.h
+endif # USE_WINGETOPT
 
 NGHTTPX_SRCS = \
 	util.cc util.h http2.cc http2.h timegm.c timegm.h base64.h \
@@ -184,6 +197,10 @@ NGHTTPX_SRCS += \
 	http3.cc http3.h \
 	quic.cc quic.h
 endif # ENABLE_HTTP3
+
+if USE_WINGETOPT
+NGHTTPX_SRCS += ../third-party/wingetopt/src/getopt.c ../third-party/wingetopt/src/getopt.h
+endif # USE_WINGETOPT
 
 noinst_LIBRARIES = libnghttpx.a
 libnghttpx_a_SOURCES = ${NGHTTPX_SRCS}
@@ -292,6 +309,10 @@ libnghttp2_asio_la_SOURCES = \
 	asio_client_request_impl.cc asio_client_request_impl.h \
 	asio_client_stream.cc asio_client_stream.h \
 	asio_client_tls_context.cc asio_client_tls_context.h
+
+if USE_WINGETOPT
+libnghttp2_asio_la_SOURCES += ../third-party/wingetopt/src/getopt.c ../third-party/wingetopt/src/getopt.h
+endif # USE_WINGETOPT
 
 libnghttp2_asio_la_CPPFLAGS = ${AM_CPPFLAGS} ${BOOST_CPPFLAGS}
 libnghttp2_asio_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined -version-info 1:0:0

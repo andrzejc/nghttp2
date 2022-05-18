@@ -5,3 +5,6 @@
 	path = third-party/neverbleed
 	url = https://github.com/tatsuhiro-t/neverbleed.git
 	branch = openssl111fix
+[submodule "third-party/wingetopt"]
+	path = third-party/wingetopt
+	url = https://github.com/alex85k/wingetopt.git

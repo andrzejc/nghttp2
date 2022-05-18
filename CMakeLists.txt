@@ -304,6 +304,7 @@ check_include_file("sys/time.h"     HAVE_SYS_TIME_H)
 check_include_file("syslog.h"       HAVE_SYSLOG_H)
 check_include_file("time.h"         HAVE_TIME_H)
 check_include_file("unistd.h"       HAVE_UNISTD_H)
+check_include_file("getopt.h"       HAVE_GETOPT_H)
 
 include(CheckTypeSize)
 # Checks for typedefs, structures, and compiler characteristics.

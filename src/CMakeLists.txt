@@ -11,6 +11,7 @@ include_directories(
   "${CMAKE_CURRENT_SOURCE_DIR}/includes"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/llhttp/include"
+  $<$<NOT:${HAVE_GETOPT_H}>:${CMAKE_CURRENT_SOURCE_DIR}/../third-party/wingetopt/src>
 
   ${JEMALLOC_INCLUDE_DIRS}
   ${LIBXML2_INCLUDE_DIRS}
@@ -46,6 +47,7 @@ if(ENABLE_APP)
   set(HELPER_OBJECTS
     util.cc
     http2.cc timegm.c app_helper.cc nghttp2_gzip.c
+    $<$<NOT:${HAVE_GETOPT_H}>:../third-party/wingetopt/src/getopt.c>
   )
 
   # nghttp client
@@ -74,6 +76,7 @@ if(ENABLE_APP)
     tls.cc
     h2load_http2_session.cc
     h2load_http1_session.cc
+    $<$<NOT:${HAVE_GETOPT_H}>:../third-party/wingetopt/src/getopt.c>
   )
   if(ENABLE_HTTP3)
     list(APPEND H2LOAD_SOURCES
@@ -124,6 +127,7 @@ if(ENABLE_APP)
     shrpx_dual_dns_resolver.cc
     shrpx_dns_tracker.cc
     xsi_strerror.c
+    $<$<NOT:${HAVE_GETOPT_H}>:../third-party/wingetopt/src/getopt.c>
   )
   if(HAVE_MRUBY)
     list(APPEND NGHTTPX_SRCS
@@ -271,6 +275,7 @@ if(ENABLE_ASIO_LIB)
     asio_client_request_impl.cc
     asio_client_stream.cc
     asio_client_tls_context.cc
+    $<$<NOT:${HAVE_GETOPT_H}>:../third-party/wingetopt/src/getopt.c>
   )
 
   add_library(nghttp2_asio SHARED
