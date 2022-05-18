@@ -31,8 +31,22 @@
 #include "template.h"
 #include "http2.h"
 
+#ifdef _WIN32
+#  include  <io.h>
+#  define open _open
+#  define close _close
+#  define read _read
+#endif
+
 namespace nghttp2 {
 namespace asio_http2 {
+// XXX ../src/asio_common.cc:44:7: warning: 'nghttp2::asio_http2::nghttp2_category_impl' has virtual functions but non-virtual destructor [-Wnon-virtual-dtor]
+// this is irrelevant as we never destroy those objects in a polymorphic way
+#if defined(__GNUC__) || defined(__clang__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
+#endif
+
 
 class nghttp2_category_impl : public boost::system::error_category {
 public:
@@ -68,6 +82,10 @@ const boost::system::error_category &nghttp2_asio_category() noexcept {
   static nghttp2_asio_category_impl cat;
   return cat;
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+#  pragma GCC diagnostic pop
+#endif
 
 boost::system::error_code make_error_code(nghttp2_asio_error ev) {
   return boost::system::error_code(static_cast<int>(ev),
