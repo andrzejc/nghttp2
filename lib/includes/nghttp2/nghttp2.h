@@ -52,6 +52,14 @@ extern "C" {
 #include <sys/types.h>
 #include <stdarg.h>
 
+/* Consumers of this header don't use #define ssize_t from out config.h,
+   so we need to make the typedef here to avoid breaking the compilation.
+   This typedef must use the same type, ensuring the ABI matches. */
+#if defined(_MSC_VER) && !defined(ssize_t)
+#  include <stddef.h>
+typedef ptrdiff_t ssize_t;
+#endif  /* !defined(_MSC_VER) || defined(ssize_t) */
+
 #include <nghttp2/nghttp2ver.h>
 
 #ifdef NGHTTP2_STATICLIB
