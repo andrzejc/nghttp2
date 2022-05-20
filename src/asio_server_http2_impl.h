@@ -54,7 +54,7 @@ public:
   void stop();
   boost::asio::io_service& io_service() const { return io_service_; }
   std::vector<int> ports() const;
-
+  void on_session(session::create_cb cb) { on_session_ = std::move(cb); }
 private:
   boost::asio::io_service& io_service_;
   std::unique_ptr<server> server_;
@@ -62,6 +62,7 @@ private:
   serve_mux mux_;
   boost::posix_time::time_duration tls_handshake_timeout_;
   boost::posix_time::time_duration read_timeout_;
+  session::create_cb on_session_;
 };
 
 } // namespace server

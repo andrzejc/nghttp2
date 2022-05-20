@@ -27,13 +27,41 @@
 
 #include <nghttp2/asio_http2.h>
 
+#include <boost/any.hpp>
 #include <boost/asio/io_service.hpp>
+#include <boost/system/error_code.hpp>
 
 namespace nghttp2 {
 
 namespace asio_http2 {
 
 namespace server {
+
+// Provides server-side Session APIs to consumers.
+class session {
+public:
+  using create_cb = std::function<void(session&)>;
+
+  using close_cb = std::function<void(session&, const boost::system::error_code&)>;
+  void on_close(close_cb cb);
+
+  void user_data(boost::any any);
+  const boost::any& user_data() const;
+
+  const boost::asio::ip::tcp::endpoint &remote_endpoint() const;
+
+  using native_handle_type = nghttp2_session*;
+  native_handle_type native_handle();
+
+private:
+  friend class http2_handler;
+
+  struct impl;
+  std::unique_ptr<impl> impl_;
+
+  explicit session(std::unique_ptr<impl> impl);
+  ~session();
+};
 
 class request_impl;
 class response_impl;
@@ -63,6 +91,8 @@ public:
 
   // Returns the remote endpoint of the request
   const boost::asio::ip::tcp::endpoint &remote_endpoint() const;
+
+  class session& session() const;
 
 private:
   std::unique_ptr<request_impl> impl_;
@@ -119,6 +149,8 @@ public:
 
   // Application must not call this directly.
   response_impl &impl() const;
+
+  class session& session() const;
 
 private:
   std::unique_ptr<response_impl> impl_;
@@ -208,6 +240,9 @@ public:
 
   // Returns a vector with the ports in use
   std::vector<int> ports() const;
+
+  // Allows to receive session start notifications.
+  void on_session(session::create_cb cb);
 
 private:
   std::unique_ptr<http2_impl> impl_;

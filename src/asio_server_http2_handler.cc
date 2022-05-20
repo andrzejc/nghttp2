@@ -31,6 +31,7 @@
 #include "asio_server_stream.h"
 #include "asio_server_request_impl.h"
 #include "asio_server_response_impl.h"
+#include "asio_server_session_impl.h"
 #include "http2.h"
 #include "util.h"
 #include "template.h"
@@ -236,12 +237,14 @@ int on_frame_not_send_callback(nghttp2_session *session,
 
 http2_handler::http2_handler(boost::asio::io_service &io_service,
                              boost::asio::ip::tcp::endpoint ep,
-                             connection_write writefun, serve_mux &mux)
+                             connection_write writefun, serve_mux &mux,
+                             session::create_cb on_session)
     : writefun_(writefun),
       mux_(mux),
       io_service_(io_service),
       remote_ep_(ep),
       session_(nullptr),
+      api_{std::make_unique<session::impl>(*this, std::move(on_session))},
       buf_(nullptr),
       buflen_(0),
       inside_callback_(false),
@@ -255,6 +258,7 @@ http2_handler::~http2_handler() {
     strm->response().impl().call_on_close(NGHTTP2_INTERNAL_ERROR);
   }
 
+  api_.impl_->call_on_close();
   nghttp2_session_del(session_);
 }
 
@@ -267,13 +271,13 @@ const std::string &http2_handler::http_date() {
   return formatted_date_;
 }
 
-int http2_handler::start() {
+boost::system::error_code http2_handler::start() {
   int rv;
 
   nghttp2_session_callbacks *callbacks;
   rv = nghttp2_session_callbacks_new(&callbacks);
   if (rv != 0) {
-    return -1;
+    return boost::system::error_code(rv, nghttp2_category());
   }
 
   auto cb_del = defer(nghttp2_session_callbacks_del, callbacks);
@@ -295,13 +299,14 @@ int http2_handler::start() {
 
   rv = nghttp2_session_server_new(&session_, callbacks, this);
   if (rv != 0) {
-    return -1;
+    return boost::system::error_code(rv, nghttp2_category());
   }
 
   nghttp2_settings_entry ent{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 100};
   nghttp2_submit_settings(session_, NGHTTP2_FLAG_NONE, &ent, 1);
 
-  return 0;
+  api_.impl_->call_on_create();
+  return {};
 }
 
 stream *http2_handler::create_stream(int32_t stream_id) {

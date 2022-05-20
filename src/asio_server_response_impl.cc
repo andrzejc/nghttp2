@@ -161,6 +161,10 @@ response_impl::call_read(uint8_t *data, std::size_t len, uint32_t *data_flags) {
   return 0;
 }
 
+class session& response_impl::session() const {
+  return strm_->handler()->session();
+}
+
 } // namespace server
 } // namespace asio_http2
 } // namespace nghttp2

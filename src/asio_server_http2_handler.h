@@ -55,11 +55,11 @@ class http2_handler : public std::enable_shared_from_this<http2_handler> {
 public:
   http2_handler(boost::asio::io_service &io_service,
                 boost::asio::ip::tcp::endpoint ep, connection_write writefun,
-                serve_mux &mux);
+                serve_mux &mux, session::create_cb on_session);
 
   ~http2_handler();
 
-  int start();
+  boost::system::error_code start();
 
   stream *create_stream(int32_t stream_id);
   void close_stream(int32_t stream_id);
@@ -95,7 +95,7 @@ public:
   const std::string &http_date();
 
   template <size_t N>
-  int on_read(const boost::array<uint8_t, N> &buffer, std::size_t len) {
+  boost::system::error_code on_read(const boost::array<uint8_t, N> &buffer, std::size_t len) {
     callback_guard cg(*this);
 
     int rv;
@@ -103,14 +103,14 @@ public:
     rv = nghttp2_session_mem_recv(session_, buffer.data(), len);
 
     if (rv < 0) {
-      return -1;
+      return boost::system::error_code(rv, nghttp2_category());
     }
 
-    return 0;
+    return {};
   }
 
   template <size_t N>
-  int on_write(boost::array<uint8_t, N> &buffer, std::size_t &len) {
+  boost::system::error_code on_write(boost::array<uint8_t, N> &buffer, std::size_t &len) {
     callback_guard cg(*this);
 
     len = 0;
@@ -128,7 +128,7 @@ public:
       const uint8_t *data;
       auto nread = nghttp2_session_mem_send(session_, &data);
       if (nread < 0) {
-        return -1;
+        return boost::system::error_code(nread, nghttp2_category());
       }
 
       if (nread == 0) {
@@ -147,16 +147,26 @@ public:
       len += nread;
     }
 
-    return 0;
+    return {};
+  }
+
+  class session& session() { return api_; }
+
+  void stop_reason(boost::system::error_code err) {
+    stop_reason_ = std::move(err);
   }
 
 private:
+  // Because session is in fact public API wrapper for this.
+  friend class session;
+
   std::map<int32_t, std::shared_ptr<stream>> streams_;
   connection_write writefun_;
   serve_mux &mux_;
   boost::asio::io_service &io_service_;
   boost::asio::ip::tcp::endpoint remote_ep_;
   nghttp2_session *session_;
+  class session api_;
   const uint8_t *buf_;
   std::size_t buflen_;
   bool inside_callback_;
@@ -165,6 +175,7 @@ private:
   bool write_signaled_;
   time_t tstamp_cached_;
   std::string formatted_date_;
+  boost::system::error_code stop_reason_;
 };
 
 } // namespace server

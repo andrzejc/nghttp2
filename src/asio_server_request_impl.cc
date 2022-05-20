@@ -23,6 +23,8 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 #include "asio_server_request_impl.h"
+#include "asio_server_stream.h"
+#include "asio_server_http2_handler.h"
 
 namespace nghttp2 {
 namespace asio_http2 {
@@ -66,6 +68,10 @@ size_t request_impl::header_buffer_size() const { return header_buffer_size_; }
 
 void request_impl::update_header_buffer_size(size_t len) {
   header_buffer_size_ += len;
+}
+
+class session& request_impl::session() const {
+  return strm_->handler()->session();
 }
 
 } // namespace server

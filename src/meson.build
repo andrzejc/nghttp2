@@ -21,6 +21,7 @@ nghttp2_asio_lib = library('nghttp2_asio', [
     'asio_server_request_impl.cc',
     'asio_server_response.cc',
     'asio_server_response_impl.cc',
+    'asio_server_session_impl.cc',
     'asio_server_stream.cc',
     'asio_server_serve_mux.cc',
     'asio_server_request_handler.cc',

@@ -86,6 +86,9 @@ boost::asio::io_service& http2::io_service() const {
 
 std::vector<int> http2::ports() const { return impl_->ports(); }
 
+void http2::on_session(session::create_cb cb) {
+  impl_->on_session(std::move(cb));
+}
 } // namespace server
 
 } // namespace asio_http2

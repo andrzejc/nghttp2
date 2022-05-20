@@ -46,10 +46,12 @@ namespace server {
 
 server::server(boost::asio::io_service& io_service,
                const boost::posix_time::time_duration &tls_handshake_timeout,
-               const boost::posix_time::time_duration &read_timeout)
+               const boost::posix_time::time_duration &read_timeout,
+               session::create_cb on_session)
     : io_service_(io_service),
       tls_handshake_timeout_(tls_handshake_timeout),
-      read_timeout_(read_timeout) {}
+      read_timeout_(read_timeout),
+      on_session_{std::move(on_session)} {}
 
 boost::system::error_code
 server::listen_and_serve(boost::system::error_code &ec,
@@ -141,18 +143,18 @@ void server::start_accept(boost::asio::ssl::context &tls_context,
           new_connection->start_tls_handshake_deadline();
           new_connection->socket().async_handshake(
               boost::asio::ssl::stream_base::server,
-              [new_connection](const boost::system::error_code &e) {
+              [new_connection, on_session=on_session_](const boost::system::error_code &e) mutable {
                 if (e) {
-                  new_connection->stop();
+                  new_connection->stop(std::move(e));
                   return;
                 }
 
                 if (!tls_h2_negotiated(new_connection->socket())) {
-                  new_connection->stop();
+                  new_connection->stop(NGHTTP2_ASIO_ERR_TLS_NO_APP_PROTO_NEGOTIATED);
                   return;
                 }
 
-                new_connection->start();
+                new_connection->start(std::move(on_session));
               });
         }
 
@@ -176,7 +178,7 @@ void server::start_accept(tcp::acceptor &acceptor, serve_mux &mux) {
         if (!e) {
           new_connection->socket().set_option(tcp::no_delay(true));
           new_connection->start_read_deadline();
-          new_connection->start();
+          new_connection->start(on_session_);
         }
         if (acceptor.is_open()) {
           start_accept(acceptor, mux);

@@ -64,7 +64,8 @@ class server : private boost::noncopyable {
 public:
   explicit server(boost::asio::io_service& io_service,
                   const boost::posix_time::time_duration &tls_handshake_timeout,
-                  const boost::posix_time::time_duration &read_timeout);
+                  const boost::posix_time::time_duration &read_timeout,
+                  session::create_cb on_session);
 
   boost::system::error_code
   listen_and_serve(boost::system::error_code &ec,
@@ -98,10 +99,9 @@ private:
   /// Acceptor used to listen for incoming connections.
   std::vector<tcp::acceptor> acceptors_;
 
-  std::unique_ptr<boost::asio::ssl::context> ssl_ctx_;
-
-  boost::posix_time::time_duration tls_handshake_timeout_;
-  boost::posix_time::time_duration read_timeout_;
+  const boost::posix_time::time_duration tls_handshake_timeout_;
+  const boost::posix_time::time_duration read_timeout_;
+  const session::create_cb on_session_;
 };
 
 } // namespace server

@@ -71,6 +71,8 @@ public:
                                       uint32_t *data_flags);
   void call_on_close(uint32_t error_code);
 
+  class session& session() const;
+
 private:
   class stream *strm_;
   header_map header_;

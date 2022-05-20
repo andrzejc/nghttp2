@@ -85,14 +85,14 @@ public:
         stopped_(false) {}
 
   /// Start the first asynchronous operation for the connection.
-  void start() {
+  void start(session::create_cb on_session) {
     boost::system::error_code ec;
 
     handler_ = std::make_shared<http2_handler>(
         GET_IO_SERVICE(socket_), socket_.lowest_layer().remote_endpoint(ec),
-        [this]() { do_write(); }, mux_);
-    if (handler_->start() != 0) {
-      stop();
+        [this]() { do_write(); }, mux_, std::move(on_session));
+    if (auto err = handler_->start()) {
+      stop(std::move(err));
       return;
     }
     do_read();
@@ -119,7 +119,7 @@ public:
 
     if (deadline_.expires_at() <=
         boost::asio::deadline_timer::traits_type::now()) {
-      stop();
+      stop(boost::asio::error::timed_out);
       deadline_.expires_at(boost::posix_time::pos_infin);
       return;
     }
@@ -138,19 +138,19 @@ public:
         [this, self](const boost::system::error_code &e,
                      std::size_t bytes_transferred) {
           if (e) {
-            stop();
+            stop(std::move(e));
             return;
           }
 
-          if (handler_->on_read(buffer_, bytes_transferred) != 0) {
-            stop();
+          if (auto err = handler_->on_read(buffer_, bytes_transferred)) {
+            stop(std::move(err));
             return;
           }
 
           do_write();
 
           if (!writing_ && handler_->should_stop()) {
-            stop();
+            stop({});
             return;
           }
 
@@ -171,19 +171,15 @@ public:
       return;
     }
 
-    int rv;
     std::size_t nwrite;
-
-    rv = handler_->on_write(outbuf_, nwrite);
-
-    if (rv != 0) {
-      stop();
+    if (auto err = handler_->on_write(outbuf_, nwrite)) {
+      stop(std::move(err));
       return;
     }
 
     if (nwrite == 0) {
       if (handler_->should_stop()) {
-        stop();
+        stop({});
       }
       return;
     }
@@ -198,7 +194,7 @@ public:
         socket_, boost::asio::buffer(outbuf_, nwrite),
         [this, self](const boost::system::error_code &e, std::size_t) {
           if (e) {
-            stop();
+            stop(std::move(e));
             return;
           }
 
@@ -213,7 +209,7 @@ public:
     // returns. The connection class's destructor closes the socket.
   }
 
-  void stop() {
+  void stop(boost::system::error_code stop_reason) {
     if (stopped_) {
       return;
     }
@@ -222,6 +218,9 @@ public:
     boost::system::error_code ignored_ec;
     socket_.lowest_layer().close(ignored_ec);
     deadline_.cancel();
+    if (handler_) {
+      handler_->stop_reason(std::move(stop_reason));
+    }
   }
 
 private:

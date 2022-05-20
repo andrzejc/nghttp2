@@ -61,6 +61,8 @@ public:
   size_t header_buffer_size() const;
   void update_header_buffer_size(size_t len);
 
+  class session& session() const;
+
 private:
   class stream *strm_;
   header_map header_;
