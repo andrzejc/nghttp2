@@ -27,6 +27,8 @@
 
 #include <nghttp2/asio_http2.h>
 
+#include <boost/asio/io_service.hpp>
+
 namespace nghttp2 {
 
 namespace asio_http2 {
@@ -132,32 +134,27 @@ class http2_impl;
 
 class http2 {
 public:
-  http2();
+  http2(boost::asio::io_service& io_service);
   ~http2();
 
   http2(http2 &&other) noexcept;
   http2 &operator=(http2 &&other) noexcept;
 
   // Starts listening connection on given address and port and serves
-  // incoming requests in cleartext TCP connection.  If |asynchronous|
-  // is false, this function blocks forever unless there is an error.
-  // If it is true, after server has started, this function returns
-  // immediately, and the caller should call stop() and join() to
+  // incoming requests in cleartext TCP connection.
+  // After server has started, this function returns
+  // immediately, and the caller should call stop() to
   // shutdown server gracefully.
   boost::system::error_code listen_and_serve(boost::system::error_code &ec,
                                              const std::string &address,
-                                             const std::string &port,
-                                             bool asynchronous = false);
+                                             const std::string &port);
 
   // Starts listening connection on given address and port and serves
-  // incoming requests in SSL/TLS encrypted connection.  For
-  // |asynchronous| parameter, see cleartext version
-  // |listen_and_serve|.
+  // incoming requests in SSL/TLS encrypted connection.
   boost::system::error_code
   listen_and_serve(boost::system::error_code &ec,
                    boost::asio::ssl::context &tls_context,
-                   const std::string &address, const std::string &port,
-                   bool asynchronous = false);
+                   const std::string &address, const std::string &port);
 
   // Registers request handler |cb| with path pattern |pattern|.  This
   // function will fail and returns false if same pattern has been
@@ -190,10 +187,6 @@ public:
   // equivalent .- and ..-free URL.
   bool handle(std::string pattern, request_cb cb);
 
-  // Sets number of native threads to handle incoming HTTP request.
-  // It defaults to 1.
-  void num_threads(size_t num_threads);
-
   // Sets the maximum length to which the queue of pending
   // connections.
   void backlog(int backlog);
@@ -211,8 +204,7 @@ public:
   void join();
 
   // Get access to the io_service objects.
-  const std::vector<std::shared_ptr<boost::asio::io_service>> &
-  io_services() const;
+  boost::asio::io_service& io_service() const;
 
   // Returns a vector with the ports in use
   std::vector<int> ports() const;

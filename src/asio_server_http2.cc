@@ -36,7 +36,7 @@ namespace asio_http2 {
 
 namespace server {
 
-http2::http2() : impl_(std::make_unique<http2_impl>()) {}
+http2::http2(boost::asio::io_service& io_service) : impl_(std::make_unique<http2_impl>(io_service)) {}
 
 http2::~http2() {}
 
@@ -54,18 +54,15 @@ http2 &http2::operator=(http2 &&other) noexcept {
 
 boost::system::error_code http2::listen_and_serve(boost::system::error_code &ec,
                                                   const std::string &address,
-                                                  const std::string &port,
-                                                  bool asynchronous) {
-  return impl_->listen_and_serve(ec, nullptr, address, port, asynchronous);
+                                                  const std::string &port) {
+  return impl_->listen_and_serve(ec, nullptr, address, port);
 }
 
 boost::system::error_code http2::listen_and_serve(
     boost::system::error_code &ec, boost::asio::ssl::context &tls_context,
-    const std::string &address, const std::string &port, bool asynchronous) {
-  return impl_->listen_and_serve(ec, &tls_context, address, port, asynchronous);
+    const std::string &address, const std::string &port) {
+  return impl_->listen_and_serve(ec, &tls_context, address, port);
 }
-
-void http2::num_threads(size_t num_threads) { impl_->num_threads(num_threads); }
 
 void http2::backlog(int backlog) { impl_->backlog(backlog); }
 
@@ -83,11 +80,8 @@ bool http2::handle(std::string pattern, request_cb cb) {
 
 void http2::stop() { impl_->stop(); }
 
-void http2::join() { return impl_->join(); }
-
-const std::vector<std::shared_ptr<boost::asio::io_service>> &
-http2::io_services() const {
-  return impl_->io_services();
+boost::asio::io_service& http2::io_service() const {
+  return impl_->io_service();
 }
 
 std::vector<int> http2::ports() const { return impl_->ports(); }
