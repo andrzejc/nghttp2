@@ -39,11 +39,11 @@ class stream {
 public:
   stream(http2_handler *h, int32_t stream_id);
 
-  int32_t get_stream_id() const;
-  class request &request();
-  class response &response();
+  int32_t get_stream_id() const { return stream_id_; }
+  class request &request() { return request_; }
+  class response &response() { return response_; }
 
-  http2_handler *handler() const;
+  http2_handler *handler() const { return handler_; }
 
 private:
   http2_handler *handler_;

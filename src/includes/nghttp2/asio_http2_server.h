@@ -68,10 +68,6 @@ class response_impl;
 
 class request {
 public:
-  // Application must not call this directly.
-  request();
-  ~request();
-
   // Returns request header fields.  The pseudo header fields, which
   // start with colon (:), are excluded from this list.
   const header_map &header() const;
@@ -87,7 +83,7 @@ public:
   void on_data(data_cb cb) const;
 
   // Application must not call this directly.
-  request_impl &impl() const;
+  request_impl &impl() const { return *impl_; }
 
   // Returns the remote endpoint of the request
   const boost::asio::ip::tcp::endpoint &remote_endpoint() const;
@@ -95,15 +91,16 @@ public:
   class session& session() const;
 
 private:
+  friend class stream;
+
+  request();
+  ~request();
+
   std::unique_ptr<request_impl> impl_;
 };
 
 class response {
 public:
-  // Application must not call this directly.
-  response();
-  ~response();
-
   // Write response header using |status_code| (e.g., 200) and
   // additional header fields in |h|.
   void write_head(unsigned int status_code, header_map h = header_map{}) const;
@@ -148,11 +145,16 @@ public:
   boost::asio::io_service &io_service() const;
 
   // Application must not call this directly.
-  response_impl &impl() const;
+  response_impl &impl() const { return *impl_; }
 
   class session& session() const;
 
 private:
+  friend class stream;
+
+  response();
+  ~response();
+
   std::unique_ptr<response_impl> impl_;
 };
 

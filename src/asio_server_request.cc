@@ -48,8 +48,6 @@ void request::on_data(data_cb cb) const {
   return impl_->on_data(std::move(cb));
 }
 
-request_impl &request::impl() const { return *impl_; }
-
 const boost::asio::ip::tcp::endpoint &request::remote_endpoint() const {
   return impl_->remote_endpoint();
 }

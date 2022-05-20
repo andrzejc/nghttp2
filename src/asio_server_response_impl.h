@@ -50,7 +50,7 @@ public:
   void end(std::string data = "");
   void end(generator_cb cb);
   void write_trailer(header_map h);
-  void on_close(close_cb cb);
+  void on_close(close_cb cb) { close_cb_ = std::move(cb); }
   void resume();
 
   void cancel(uint32_t error_code);
@@ -62,11 +62,11 @@ public:
 
   void start_response();
 
-  unsigned int status_code() const;
-  const header_map &header() const;
-  void pushed(bool f);
+  unsigned int status_code() const { return status_code_; }
+  const header_map &header() const { return header_; }
+  void pushed(bool f) { pushed_ = f; }
   void push_promise_sent();
-  void stream(class stream *s);
+  void stream(class stream *s) { strm_ = s; }
   generator_cb::result_type call_read(uint8_t *data, std::size_t len,
                                       uint32_t *data_flags);
   void call_on_close(uint32_t error_code);

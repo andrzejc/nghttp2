@@ -52,17 +52,6 @@ boost::system::error_code http2_impl::listen_and_serve(
                                    mux_);
 }
 
-void http2_impl::backlog(int backlog) { backlog_ = backlog; }
-
-void http2_impl::tls_handshake_timeout(
-    const boost::posix_time::time_duration &t) {
-  tls_handshake_timeout_ = t;
-}
-
-void http2_impl::read_timeout(const boost::posix_time::time_duration &t) {
-  read_timeout_ = t;
-}
-
 bool http2_impl::handle(std::string pattern, request_cb cb) {
   return mux_.handle(std::move(pattern), std::move(cb));
 }

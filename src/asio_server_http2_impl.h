@@ -47,9 +47,13 @@ public:
   boost::system::error_code listen_and_serve(
       boost::system::error_code &ec, boost::asio::ssl::context *tls_context,
       const std::string &address, const std::string &port);
-  void backlog(int backlog);
-  void tls_handshake_timeout(const boost::posix_time::time_duration &t);
-  void read_timeout(const boost::posix_time::time_duration &t);
+  void backlog(int backlog) { backlog_ = backlog; }
+  void tls_handshake_timeout(const boost::posix_time::time_duration &t) {
+    tls_handshake_timeout_ = t;
+  }
+  void read_timeout(const boost::posix_time::time_duration &t) {
+    read_timeout_ = t;
+  }
   bool handle(std::string pattern, request_cb cb);
   void stop();
   boost::asio::io_service& io_service() const { return io_service_; }

@@ -43,8 +43,6 @@ response_impl::response_impl()
       pushed_(false),
       push_promise_sent_(false) {}
 
-unsigned int response_impl::status_code() const { return status_code_; }
-
 void response_impl::write_head(unsigned int status_code, header_map h) {
   if (state_ != response_state::INITIAL) {
     return;
@@ -104,8 +102,6 @@ void response_impl::start_response() {
   }
 }
 
-void response_impl::on_close(close_cb cb) { close_cb_ = std::move(cb); }
-
 void response_impl::call_on_close(uint32_t error_code) {
   if (close_cb_) {
     close_cb_(error_code);
@@ -133,8 +129,6 @@ boost::asio::io_service &response_impl::io_service() {
   return strm_->handler()->io_service();
 }
 
-void response_impl::pushed(bool f) { pushed_ = f; }
-
 void response_impl::push_promise_sent() {
   if (push_promise_sent_) {
     return;
@@ -145,10 +139,6 @@ void response_impl::push_promise_sent() {
   }
   start_response();
 }
-
-const header_map &response_impl::header() const { return header_; }
-
-void response_impl::stream(class stream *s) { strm_ = s; }
 
 generator_cb::result_type
 response_impl::call_read(uint8_t *data, std::size_t len, uint32_t *data_flags) {

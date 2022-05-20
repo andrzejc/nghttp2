@@ -38,18 +38,6 @@ stream::stream(http2_handler *h, int32_t stream_id)
   response_.impl().stream(this);
 }
 
-int32_t stream::get_stream_id() const { return stream_id_; }
-
-class request &stream::request() {
-  return request_;
-}
-
-class response &stream::response() {
-  return response_;
-}
-
-http2_handler *stream::handler() const { return handler_; }
-
 } // namespace server
 } // namespace asio_http2
 } // namespace nghttp2

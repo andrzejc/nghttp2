@@ -88,9 +88,9 @@ public:
 
   void signal_write();
 
-  boost::asio::io_service &io_service();
+  boost::asio::io_service &io_service() const { return io_service_; }
 
-  const boost::asio::ip::tcp::endpoint &remote_endpoint();
+  const boost::asio::ip::tcp::endpoint &remote_endpoint() const { return remote_ep_; }
 
   const std::string &http_date();
 

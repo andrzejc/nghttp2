@@ -40,26 +40,32 @@ class request_impl {
 public:
   request_impl();
 
-  void header(header_map h);
-  const header_map &header() const;
-  header_map &header();
+  void header(header_map h) { header_ = std::move(h); }
+  const header_map &header() const { return header_; }
+  header_map &header() { return header_; }
 
-  void method(std::string method);
-  const std::string &method() const;
+  void method(std::string method) { method_ = std::move(method); }
+  const std::string &method() const { return method_; }
 
-  const uri_ref &uri() const;
-  uri_ref &uri();
+  const uri_ref &uri() const { return uri_; }
+  uri_ref &uri() { return uri_; }
 
-  void on_data(data_cb cb);
+  void on_data(data_cb cb) { on_data_cb_ = std::move(cb); }
 
-  void stream(class stream *s);
+  void stream(class stream *s) { strm_ = s; }
   void call_on_data(const uint8_t *data, std::size_t len);
 
-  const boost::asio::ip::tcp::endpoint &remote_endpoint() const;
-  void remote_endpoint(boost::asio::ip::tcp::endpoint ep);
+  const boost::asio::ip::tcp::endpoint &remote_endpoint() const {
+    return remote_ep_;
+  }
+  void remote_endpoint(boost::asio::ip::tcp::endpoint ep) {
+    remote_ep_ = std::move(ep);
+  }
 
-  size_t header_buffer_size() const;
-  void update_header_buffer_size(size_t len);
+  size_t header_buffer_size() const { return header_buffer_size_; }
+  void update_header_buffer_size(size_t len) {
+    header_buffer_size_ += len;
+  }
 
   class session& session() const;
 
