@@ -68,6 +68,7 @@ boost::asio::io_service &response::io_service() const {
   return impl_->io_service();
 }
 
+session& response::session() const { return impl_->session(); }
 } // namespace server
 } // namespace asio_http2
 } // namespace nghttp2
