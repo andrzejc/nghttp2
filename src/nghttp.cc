@@ -123,7 +123,8 @@ Config::Config()
       no_push(false),
       expect_continue(false),
       verify_peer(true),
-      ktls(false) {
+      ktls(false),
+      no_rfc7540_pri(false) {
   nghttp2_option_new(&http2_option);
   nghttp2_option_set_peer_max_concurrent_streams(http2_option,
                                                  peer_max_concurrent_streams);
@@ -932,6 +933,12 @@ size_t populate_settings(nghttp2_settings_entry *iv) {
   if (config.no_push) {
     iv[niv].settings_id = NGHTTP2_SETTINGS_ENABLE_PUSH;
     iv[niv].value = 0;
+    ++niv;
+  }
+
+  if (config.no_rfc7540_pri) {
+    iv[niv].settings_id = NGHTTP2_SETTINGS_NO_RFC7540_PRIORITIES;
+    iv[niv].value = 1;
     ++niv;
   }
 
@@ -2757,6 +2764,8 @@ Options:
               Suppress  warning  on  server  certificate  verification
               failure.
   --ktls      Enable ktls.
+  --no-rfc7540-pri
+              Disable RFC7540 priorities.
   --version   Display version information and exit.
   -h, --help  Display this help and exit.
 
@@ -2813,6 +2822,7 @@ int main(int argc, char **argv) {
         {"expect-continue", no_argument, &flag, 13},
         {"encoder-header-table-size", required_argument, &flag, 14},
         {"ktls", no_argument, &flag, 15},
+        {"no-rfc7540-pri", no_argument, &flag, 16},
         {nullptr, 0, nullptr, 0}};
     int option_index = 0;
     int c =
@@ -2822,33 +2832,43 @@ int main(int argc, char **argv) {
       break;
     }
     switch (c) {
-    case 'M':
+    case 'M': {
       // peer-max-concurrent-streams option
-      config.peer_max_concurrent_streams = strtoul(optarg, nullptr, 10);
+      auto n = util::parse_uint(optarg);
+      if (n == -1) {
+        std::cerr << "-M: Bad option value: " << optarg << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      config.peer_max_concurrent_streams = n;
       break;
+    }
     case 'O':
       config.remote_name = true;
       break;
     case 'h':
       print_help(std::cout);
       exit(EXIT_SUCCESS);
-    case 'b':
-      config.padding = strtol(optarg, nullptr, 10);
+    case 'b': {
+      auto n = util::parse_uint(optarg);
+      if (n == -1) {
+        std::cerr << "-b: Bad option value: " << optarg << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      config.padding = n;
       break;
+    }
     case 'n':
       config.null_out = true;
       break;
     case 'p': {
-      errno = 0;
-      auto n = strtoul(optarg, nullptr, 10);
-      if (errno == 0 && NGHTTP2_MIN_WEIGHT <= n && n <= NGHTTP2_MAX_WEIGHT) {
-        config.weight.push_back(n);
-      } else {
+      auto n = util::parse_uint(optarg);
+      if (n == -1 || NGHTTP2_MIN_WEIGHT > n || n > NGHTTP2_MAX_WEIGHT) {
         std::cerr << "-p: specify the integer in the range ["
                   << NGHTTP2_MIN_WEIGHT << ", " << NGHTTP2_MAX_WEIGHT
                   << "], inclusive" << std::endl;
         exit(EXIT_FAILURE);
       }
+      config.weight.push_back(n);
       break;
     }
     case 'r':
@@ -2874,20 +2894,17 @@ int main(int argc, char **argv) {
       break;
     case 'w':
     case 'W': {
-      errno = 0;
-      char *endptr = nullptr;
-      unsigned long int n = strtoul(optarg, &endptr, 10);
-      if (errno == 0 && *endptr == '\0' && n < 31) {
-        if (c == 'w') {
-          config.window_bits = n;
-        } else {
-          config.connection_window_bits = n;
-        }
-      } else {
+      auto n = util::parse_uint(optarg);
+      if (n == -1 || n > 30) {
         std::cerr << "-" << static_cast<char>(c)
                   << ": specify the integer in the range [0, 30], inclusive"
                   << std::endl;
         exit(EXIT_FAILURE);
+      }
+      if (c == 'w') {
+        config.window_bits = n;
+      } else {
+        config.connection_window_bits = n;
       }
       break;
     }
@@ -2929,9 +2946,15 @@ int main(int argc, char **argv) {
     case 'd':
       config.datafile = optarg;
       break;
-    case 'm':
-      config.multiply = strtoul(optarg, nullptr, 10);
+    case 'm': {
+      auto n = util::parse_uint(optarg);
+      if (n == -1) {
+        std::cerr << "-m: Bad option value: " << optarg << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      config.multiply = n;
       break;
+    }
     case 'c': {
       auto n = util::parse_uint_with_unit(optarg);
       if (n == -1) {
@@ -3015,10 +3038,17 @@ int main(int argc, char **argv) {
         // no-push option
         config.no_push = true;
         break;
-      case 12:
+      case 12: {
         // max-concurrent-streams option
-        config.max_concurrent_streams = strtoul(optarg, nullptr, 10);
+        auto n = util::parse_uint(optarg);
+        if (n == -1) {
+          std::cerr << "--max-concurrent-streams: Bad option value: " << optarg
+                    << std::endl;
+          exit(EXIT_FAILURE);
+        }
+        config.max_concurrent_streams = n;
         break;
+      }
       case 13:
         // expect-continue option
         config.expect_continue = true;
@@ -3043,6 +3073,10 @@ int main(int argc, char **argv) {
       case 15:
         // ktls option
         config.ktls = true;
+        break;
+      case 16:
+        // no-rfc7540-pri option
+        config.no_rfc7540_pri = true;
         break;
       }
       break;

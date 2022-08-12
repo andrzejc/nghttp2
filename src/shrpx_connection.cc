@@ -44,13 +44,13 @@ using namespace nghttp2;
 
 namespace shrpx {
 
-#if !LIBRESSL_2_7_API && !OPENSSL_1_1_API
+#if !LIBRESSL_3_5_API && !LIBRESSL_2_7_API && !OPENSSL_1_1_API
 
 void *BIO_get_data(BIO *bio) { return bio->ptr; }
 void BIO_set_data(BIO *bio, void *ptr) { bio->ptr = ptr; }
 void BIO_set_init(BIO *bio, int init) { bio->init = init; }
 
-#endif // !LIBRESSL_2_7_API && !OPENSSL_1_1_API
+#endif // !LIBRESSL_3_5_API && !LIBRESSL_2_7_API && !OPENSSL_1_1_API
 
 Connection::Connection(struct ev_loop *loop, int fd, SSL *ssl,
                        MemchunkPool *mcpool, ev_tstamp write_timeout,
@@ -60,7 +60,11 @@ Connection::Connection(struct ev_loop *loop, int fd, SSL *ssl,
                        IOCb readcb, TimerCb timeoutcb, void *data,
                        size_t tls_dyn_rec_warmup_threshold,
                        ev_tstamp tls_dyn_rec_idle_timeout, Proto proto)
-    : tls{DefaultMemchunks(mcpool), DefaultPeekMemchunks(mcpool),
+    :
+#ifdef ENABLE_HTTP3
+      conn_ref{nullptr, this},
+#endif // ENABLE_HTTP3
+      tls{DefaultMemchunks(mcpool), DefaultPeekMemchunks(mcpool),
           DefaultMemchunks(mcpool)},
       wlimit(loop, &wev, write_limit.rate, write_limit.burst),
       rlimit(loop, &rev, read_limit.rate, read_limit.burst, this),
@@ -97,21 +101,24 @@ Connection::~Connection() { disconnect(); }
 
 void Connection::disconnect() {
   if (tls.ssl) {
-    SSL_set_shutdown(tls.ssl,
-                     SSL_get_shutdown(tls.ssl) | SSL_RECEIVED_SHUTDOWN);
-    ERR_clear_error();
+    if (proto != Proto::HTTP3) {
+      SSL_set_shutdown(tls.ssl,
+                       SSL_get_shutdown(tls.ssl) | SSL_RECEIVED_SHUTDOWN);
+      ERR_clear_error();
 
-    if (tls.cached_session) {
-      SSL_SESSION_free(tls.cached_session);
-      tls.cached_session = nullptr;
+      if (tls.cached_session) {
+        SSL_SESSION_free(tls.cached_session);
+        tls.cached_session = nullptr;
+      }
+
+      if (tls.cached_session_lookup_req) {
+        tls.cached_session_lookup_req->canceled = true;
+        tls.cached_session_lookup_req = nullptr;
+      }
+
+      SSL_shutdown(tls.ssl);
     }
 
-    if (tls.cached_session_lookup_req) {
-      tls.cached_session_lookup_req->canceled = true;
-      tls.cached_session_lookup_req = nullptr;
-    }
-
-    SSL_shutdown(tls.ssl);
     SSL_free(tls.ssl);
     tls.ssl = nullptr;
 
@@ -259,14 +266,14 @@ long shrpx_bio_ctrl(BIO *b, int cmd, long num, void *ptr) {
 
 namespace {
 int shrpx_bio_create(BIO *b) {
-#if OPENSSL_1_1_API
+#if OPENSSL_1_1_API || LIBRESSL_3_5_API
   BIO_set_init(b, 1);
-#else  // !OPENSSL_1_1_API
+#else  // !OPENSSL_1_1_API && !LIBRESSL_3_5_API
   b->init = 1;
   b->num = 0;
   b->ptr = nullptr;
   b->flags = 0;
-#endif // !OPENSSL_1_1_API
+#endif // !OPENSSL_1_1_API && !LIBRESSL_3_5_API
   return 1;
 }
 } // namespace
@@ -277,17 +284,17 @@ int shrpx_bio_destroy(BIO *b) {
     return 0;
   }
 
-#if !OPENSSL_1_1_API
+#if !OPENSSL_1_1_API && !LIBRESSL_3_5_API
   b->ptr = nullptr;
   b->init = 0;
   b->flags = 0;
-#endif // !OPENSSL_1_1_API
+#endif // !OPENSSL_1_1_API && !LIBRESSL_3_5_API
 
   return 1;
 }
 } // namespace
 
-#if OPENSSL_1_1_API
+#if OPENSSL_1_1_API || LIBRESSL_3_5_API
 
 BIO_METHOD *create_bio_method() {
   auto meth = BIO_meth_new(BIO_TYPE_FD, "nghttpx-bio");
@@ -302,7 +309,7 @@ BIO_METHOD *create_bio_method() {
   return meth;
 }
 
-#else // !OPENSSL_1_1_API
+#else // !OPENSSL_1_1_API && !LIBRESSL_3_5_API
 
 BIO_METHOD *create_bio_method() {
   static auto meth = new BIO_METHOD{
@@ -314,7 +321,7 @@ BIO_METHOD *create_bio_method() {
   return meth;
 }
 
-#endif // !OPENSSL_1_1_API
+#endif // !OPENSSL_1_1_API && !LIBRESSL_3_5_API
 
 void Connection::set_ssl(SSL *ssl) {
   tls.ssl = ssl;
@@ -1145,6 +1152,42 @@ ssize_t Connection::read_clear(void *data, size_t len) {
   }
 
   rlimit.drain(nread);
+
+  return nread;
+}
+
+ssize_t Connection::read_nolim_clear(void *data, size_t len) {
+  ssize_t nread;
+  while ((nread = read(fd, data, len)) == -1 && errno == EINTR)
+    ;
+  if (nread == -1) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      return 0;
+    }
+    return SHRPX_ERR_NETWORK;
+  }
+
+  if (nread == 0) {
+    return SHRPX_ERR_EOF;
+  }
+
+  return nread;
+}
+
+ssize_t Connection::peek_clear(void *data, size_t len) {
+  ssize_t nread;
+  while ((nread = recv(fd, data, len, MSG_PEEK)) == -1 && errno == EINTR)
+    ;
+  if (nread == -1) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      return 0;
+    }
+    return SHRPX_ERR_NETWORK;
+  }
+
+  if (nread == 0) {
+    return SHRPX_ERR_EOF;
+  }
 
   return nread;
 }

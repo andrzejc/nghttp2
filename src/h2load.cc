@@ -51,8 +51,13 @@
 #include <openssl/err.h>
 
 #ifdef ENABLE_HTTP3
-#  include <ngtcp2/ngtcp2.h>
-#endif // ENABLE_HTTP3
+#  ifdef HAVE_LIBNGTCP2_CRYPTO_OPENSSL
+#    include <ngtcp2/ngtcp2_crypto_openssl.h>
+#  endif // HAVE_LIBNGTCP2_CRYPTO_OPENSSL
+#  ifdef HAVE_LIBNGTCP2_CRYPTO_BORINGSSL
+#    include <ngtcp2/ngtcp2_crypto_boringssl.h>
+#  endif // HAVE_LIBNGTCP2_CRYPTO_BORINGSSL
+#endif   // ENABLE_HTTP3
 
 #include "url-parser/url_parser.h"
 
@@ -724,12 +729,17 @@ void Client::disconnect() {
   ev_io_stop(worker->loop, &wev);
   ev_io_stop(worker->loop, &rev);
   if (ssl) {
-    SSL_set_shutdown(ssl, SSL_get_shutdown(ssl) | SSL_RECEIVED_SHUTDOWN);
-    ERR_clear_error();
-
-    if (SSL_shutdown(ssl) != 1) {
+    if (config.is_quic()) {
       SSL_free(ssl);
       ssl = nullptr;
+    } else {
+      SSL_set_shutdown(ssl, SSL_get_shutdown(ssl) | SSL_RECEIVED_SHUTDOWN);
+      ERR_clear_error();
+
+      if (SSL_shutdown(ssl) != 1) {
+        SSL_free(ssl);
+        ssl = nullptr;
+      }
     }
   }
   if (fd != -1) {
@@ -1456,7 +1466,7 @@ int Client::write_udp(const sockaddr *addr, socklen_t addrlen,
 
   auto nwrite = sendmsg(fd, &msg, 0);
   if (nwrite < 0) {
-    if (nwrite == EAGAIN || nwrite == EWOULDBLOCK) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
       return 1;
     }
 
@@ -2360,43 +2370,64 @@ int main(int argc, char **argv) {
       break;
     }
     switch (c) {
-    case 'n':
-      config.nreqs = strtoul(optarg, nullptr, 10);
+    case 'n': {
+      auto n = util::parse_uint(optarg);
+      if (n == -1) {
+        std::cerr << "-n: bad option value: " << optarg << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      config.nreqs = n;
       nreqs_set_manually = true;
       break;
-    case 'c':
-      config.nclients = strtoul(optarg, nullptr, 10);
+    }
+    case 'c': {
+      auto n = util::parse_uint(optarg);
+      if (n == -1) {
+        std::cerr << "-c: bad option value: " << optarg << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      config.nclients = n;
       break;
+    }
     case 'd':
       datafile = optarg;
       break;
-    case 't':
+    case 't': {
 #ifdef NOTHREADS
       std::cerr << "-t: WARNING: Threading disabled at build time, "
                 << "no threads created." << std::endl;
 #else
-      config.nthreads = strtoul(optarg, nullptr, 10);
+      auto n = util::parse_uint(optarg);
+      if (n == -1) {
+        std::cerr << "-t: bad option value: " << optarg << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      config.nthreads = n;
 #endif // NOTHREADS
       break;
-    case 'm':
-      config.max_concurrent_streams = strtoul(optarg, nullptr, 10);
+    }
+    case 'm': {
+      auto n = util::parse_uint(optarg);
+      if (n == -1) {
+        std::cerr << "-m: bad option value: " << optarg << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      config.max_concurrent_streams = n;
       break;
+    }
     case 'w':
     case 'W': {
-      errno = 0;
-      char *endptr = nullptr;
-      auto n = strtoul(optarg, &endptr, 10);
-      if (errno == 0 && *endptr == '\0' && n < 31) {
-        if (c == 'w') {
-          config.window_bits = n;
-        } else {
-          config.connection_window_bits = n;
-        }
-      } else {
+      auto n = util::parse_uint(optarg);
+      if (n == -1 || n > 30) {
         std::cerr << "-" << static_cast<char>(c)
                   << ": specify the integer in the range [0, 30], inclusive"
                   << std::endl;
         exit(EXIT_FAILURE);
+      }
+      if (c == 'w') {
+        config.window_bits = n;
+      } else {
+        config.connection_window_bits = n;
       }
       break;
     }
@@ -2460,14 +2491,20 @@ int main(int argc, char **argv) {
       }
       break;
     }
-    case 'r':
-      config.rate = strtoul(optarg, nullptr, 10);
-      if (config.rate == 0) {
+    case 'r': {
+      auto n = util::parse_uint(optarg);
+      if (n == -1) {
+        std::cerr << "-r: bad option value: " << optarg << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      if (n == 0) {
         std::cerr << "-r: the rate at which connections are made "
                   << "must be positive." << std::endl;
         exit(EXIT_FAILURE);
       }
+      config.rate = n;
       break;
+    }
     case 'T':
       config.conn_active_timeout = util::parse_duration_with_unit(optarg);
       if (!std::isfinite(config.conn_active_timeout)) {
@@ -2878,9 +2915,21 @@ int main(int argc, char **argv) {
 
   if (config.is_quic()) {
 #ifdef ENABLE_HTTP3
-    SSL_CTX_set_min_proto_version(ssl_ctx, TLS1_3_VERSION);
-    SSL_CTX_set_max_proto_version(ssl_ctx, TLS1_3_VERSION);
-#endif // ENABLE_HTTP3
+#  ifdef HAVE_LIBNGTCP2_CRYPTO_OPENSSL
+    if (ngtcp2_crypto_openssl_configure_client_context(ssl_ctx) != 0) {
+      std::cerr << "ngtcp2_crypto_openssl_configure_client_context failed"
+                << std::endl;
+      exit(EXIT_FAILURE);
+    }
+#  endif // HAVE_LIBNGTCP2_CRYPTO_OPENSSL
+#  ifdef HAVE_LIBNGTCP2_CRYPTO_BORINGSSL
+    if (ngtcp2_crypto_boringssl_configure_client_context(ssl_ctx) != 0) {
+      std::cerr << "ngtcp2_crypto_boringssl_configure_client_context failed"
+                << std::endl;
+      exit(EXIT_FAILURE);
+    }
+#  endif // HAVE_LIBNGTCP2_CRYPTO_BORINGSSL
+#endif   // ENABLE_HTTP3
   } else if (nghttp2::tls::ssl_ctx_set_proto_versions(
                  ssl_ctx, nghttp2::tls::NGHTTP2_TLS_MIN_VERSION,
                  nghttp2::tls::NGHTTP2_TLS_MAX_VERSION) != 0) {
