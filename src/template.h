@@ -33,6 +33,7 @@
 #include <memory>
 #include <array>
 #include <functional>
+#include <type_traits>
 #include <typeinfo>
 #include <algorithm>
 #include <ostream>
@@ -67,8 +68,13 @@ template <typename F, typename... T> struct Defer {
   Defer(Defer &&o) noexcept : f(std::move(o.f)) {}
   ~Defer() { f(); }
 
+#if defined(__cpp_lib_is_invocable) && __cpp_lib_is_invocable >= 201703L
+  using ResultType = typename std::invoke_result<typename std::decay<F>::type,
+      typename std::decay<T>::type...>::type;
+#else
   using ResultType = typename std::result_of<typename std::decay<F>::type(
       typename std::decay<T>::type...)>::type;
+#endif
   std::function<ResultType()> f;
 };
 
