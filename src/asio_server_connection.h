@@ -89,8 +89,16 @@ public:
     boost::system::error_code ec;
 
     handler_ = std::make_shared<http2_handler>(
-        GET_IO_SERVICE(socket_), socket_.lowest_layer().remote_endpoint(ec),
-        [this]() { do_write(); }, mux_, std::move(on_session));
+        GET_IO_SERVICE(socket_),
+        socket_.lowest_layer().remote_endpoint(ec),
+        [weak = this->weak_from_this()] {
+          if (auto strong = weak.lock()) {
+            strong->do_write();
+          }
+        },
+        mux_,
+        std::move(on_session)
+      );
     if (auto err = handler_->start()) {
       stop(std::move(err));
       return;
