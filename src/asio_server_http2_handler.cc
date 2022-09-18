@@ -238,7 +238,8 @@ int on_frame_not_send_callback(nghttp2_session *session,
 http2_handler::http2_handler(boost::asio::io_service &io_service,
                              boost::asio::ip::tcp::endpoint ep,
                              connection_write writefun, serve_mux &mux,
-                             session::create_cb on_session)
+                             session::create_cb on_session,
+                             connection_base& conn)
     : writefun_(writefun),
       mux_(mux),
       io_service_(io_service),
@@ -250,7 +251,8 @@ http2_handler::http2_handler(boost::asio::io_service &io_service,
       inside_callback_(false),
       write_signaled_(false),
       tstamp_cached_(time(nullptr)),
-      formatted_date_(util::http_date(tstamp_cached_)) {}
+      formatted_date_(util::http_date(tstamp_cached_)),
+      conn_{conn} {}
 
 http2_handler::~http2_handler() {
   for (auto &p : streams_) {
@@ -419,8 +421,11 @@ void http2_handler::stream_error(int32_t stream_id, uint32_t error_code) {
 void http2_handler::signal_write() {
   if (!inside_callback_ && !write_signaled_) {
     write_signaled_ = true;
-    auto self = shared_from_this();
-    io_service_.post([self]() { self->initiate_write(); });
+    io_service_.post([weak = weak_from_this()] {
+      if (auto self = weak.lock()) {
+        self->initiate_write();
+      }
+    });
   }
 }
 

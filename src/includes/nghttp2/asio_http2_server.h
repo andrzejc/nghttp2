@@ -29,6 +29,7 @@
 
 #include <boost/any.hpp>
 #include <boost/asio/io_service.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/system/error_code.hpp>
 
 namespace nghttp2 {
@@ -89,6 +90,9 @@ public:
   const boost::asio::ip::tcp::endpoint &remote_endpoint() const;
 
   class session& session() const;
+
+  boost::posix_time::time_duration read_timeout() const;
+  void read_timeout(boost::posix_time::time_duration duration) const;
 
 private:
   friend class stream;

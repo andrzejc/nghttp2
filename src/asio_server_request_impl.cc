@@ -25,6 +25,7 @@
 #include "asio_server_request_impl.h"
 #include "asio_server_stream.h"
 #include "asio_server_http2_handler.h"
+#include "asio_server_connection.h"
 
 namespace nghttp2 {
 namespace asio_http2 {
@@ -40,6 +41,14 @@ void request_impl::call_on_data(const uint8_t *data, std::size_t len) {
 
 class session& request_impl::session() const {
   return strm_->handler()->session();
+}
+
+boost::posix_time::time_duration request_impl::read_timeout() const {
+  return strm_->handler()->connection().read_timeout();
+}
+
+void request_impl::read_timeout(boost::posix_time::time_duration timeout) {
+  strm_->handler()->connection().set_read_timeout(timeout);
 }
 
 } // namespace server

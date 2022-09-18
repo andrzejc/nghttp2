@@ -3,7 +3,7 @@ project('nghttp2', 'c', 'cpp',
   meson_version: '>=0.58.0',
   license: 'MIT',
   default_options: [
-    'cpp_std=c++14',
+    'cpp_std=c++17',
     'default_library=static',
 ]
 )

@@ -51,11 +51,14 @@ struct callback_guard {
 
 using connection_write = std::function<void(void)>;
 
+struct connection_base;
+
 class http2_handler : public std::enable_shared_from_this<http2_handler> {
 public:
   http2_handler(boost::asio::io_service &io_service,
                 boost::asio::ip::tcp::endpoint ep, connection_write writefun,
-                serve_mux &mux, session::create_cb on_session);
+                serve_mux &mux, session::create_cb on_session,
+                connection_base& conn);
 
   ~http2_handler();
 
@@ -156,6 +159,9 @@ public:
     stop_reason_ = std::move(err);
   }
 
+  connection_base& connection() { return conn_; }
+  const connection_base& connection() const { return conn_; }
+
 private:
   // Because session is in fact public API wrapper for this.
   friend class session;
@@ -176,6 +182,7 @@ private:
   time_t tstamp_cached_;
   std::string formatted_date_;
   boost::system::error_code stop_reason_;
+  connection_base& conn_;
 };
 
 } // namespace server

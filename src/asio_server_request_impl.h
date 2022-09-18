@@ -69,6 +69,9 @@ public:
 
   class session& session() const;
 
+  boost::posix_time::time_duration read_timeout() const;
+  void read_timeout(boost::posix_time::time_duration duration);
+
 private:
   class stream *strm_;
   header_map header_;

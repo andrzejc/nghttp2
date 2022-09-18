@@ -52,6 +52,14 @@ const boost::asio::ip::tcp::endpoint &request::remote_endpoint() const {
   return impl_->remote_endpoint();
 }
 
+boost::posix_time::time_duration request::read_timeout() const {
+  return impl_->read_timeout();
+}
+
+void request::read_timeout(boost::posix_time::time_duration timeout) const {
+  impl_->read_timeout(timeout);
+}
+
 } // namespace server
 } // namespace asio_http2
 } // namespace nghttp2

@@ -64,9 +64,16 @@ namespace asio_http2 {
 
 namespace server {
 
+struct connection_base {
+  virtual ~connection_base() = default;
+  virtual boost::posix_time::time_duration read_timeout() const = 0;
+  virtual void set_read_timeout(boost::posix_time::time_duration timeout) = 0;
+};
+
 /// Represents a single connection from a client.
 template <typename socket_type>
 class connection : public std::enable_shared_from_this<connection<socket_type>>,
+                   public connection_base,
                    private boost::noncopyable {
 public:
   /// Construct a connection with the given io_service.
@@ -97,7 +104,8 @@ public:
           }
         },
         mux_,
-        std::move(on_session)
+        std::move(on_session),
+        *this
       );
     if (auto err = handler_->start()) {
       stop(std::move(err));
@@ -229,6 +237,16 @@ public:
     if (handler_) {
       handler_->stop_reason(std::move(stop_reason));
     }
+  }
+
+  boost::posix_time::time_duration read_timeout() const override { return read_timeout_; }
+  void set_read_timeout(boost::posix_time::time_duration timeout) override {
+    if (stopped_) {
+      return;
+    }
+
+    read_timeout_ = timeout;
+    deadline_.expires_from_now(read_timeout_);
   }
 
 private:
