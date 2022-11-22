@@ -479,7 +479,7 @@ int Http3Upstream::handshake_completed() {
     return -1;
   }
 
-  std::array<uint8_t, NGTCP2_CRYPTO_MAX_REGULAR_TOKENLEN> token;
+  std::array<uint8_t, NGTCP2_CRYPTO_MAX_REGULAR_TOKENLEN + 1> token;
   size_t tokenlen;
 
   auto path = ngtcp2_conn_get_path(conn_);
@@ -493,6 +493,10 @@ int Http3Upstream::handshake_completed() {
                      qkm.secret.size()) != 0) {
     return 0;
   }
+
+  assert(tokenlen == NGTCP2_CRYPTO_MAX_REGULAR_TOKENLEN);
+
+  token[tokenlen++] = qkm.id;
 
   auto rv = ngtcp2_conn_submit_new_token(conn_, token.data(), tokenlen);
   if (rv != 0) {
@@ -607,7 +611,7 @@ int Http3Upstream::init(const UpstreamAddr *faddr, const Address &remote_addr,
   settings.cc_algo = quicconf.upstream.congestion_controller;
   settings.max_window = http3conf.upstream.max_connection_window_size;
   settings.max_stream_window = http3conf.upstream.max_window_size;
-  settings.max_udp_payload_size = SHRPX_QUIC_MAX_UDP_PAYLOAD_SIZE;
+  settings.max_tx_udp_payload_size = SHRPX_QUIC_MAX_UDP_PAYLOAD_SIZE;
   settings.rand_ctx.native_handle = &worker->get_randgen();
   settings.token = ngtcp2_vec{const_cast<uint8_t *>(token), tokenlen};
 
@@ -734,14 +738,12 @@ int Http3Upstream::on_write() {
 
 int Http3Upstream::write_streams() {
   std::array<nghttp3_vec, 16> vec;
-  auto max_udp_payload_size = ngtcp2_conn_get_max_udp_payload_size(conn_);
+  auto max_udp_payload_size = ngtcp2_conn_get_max_tx_udp_payload_size(conn_);
 #ifdef UDP_SEGMENT
   auto path_max_udp_payload_size =
-      ngtcp2_conn_get_path_max_udp_payload_size(conn_);
+      ngtcp2_conn_get_path_max_tx_udp_payload_size(conn_);
 #endif // UDP_SEGMENT
-  size_t max_pktcnt =
-      std::min(static_cast<size_t>(64_k), ngtcp2_conn_get_send_quantum(conn_)) /
-      max_udp_payload_size;
+  auto max_pktcnt = ngtcp2_conn_get_send_quantum(conn_) / max_udp_payload_size;
   ngtcp2_pkt_info pi, prev_pi;
   uint8_t *bufpos = tx_.data.get();
   ngtcp2_path_storage ps, prev_ps;
@@ -752,17 +754,6 @@ int Http3Upstream::write_streams() {
 
   ngtcp2_path_storage_zero(&ps);
   ngtcp2_path_storage_zero(&prev_ps);
-
-  auto config = get_config();
-  auto &quicconf = config->quic;
-
-  switch (quicconf.upstream.congestion_controller) {
-  case NGTCP2_CC_ALGO_BBR:
-  case NGTCP2_CC_ALGO_BBR2:
-    break;
-  default:
-    max_pktcnt = std::min(max_pktcnt, static_cast<size_t>(10));
-  }
 
   for (;;) {
     int64_t stream_id = -1;
@@ -1773,13 +1764,10 @@ int Http3Upstream::on_read(const UpstreamAddr *faddr,
       auto worker = handler_->get_worker();
       auto quic_conn_handler = worker->get_quic_connection_handler();
 
-      uint32_t version;
-      const uint8_t *dcid, *scid;
-      size_t dcidlen, scidlen;
+      ngtcp2_version_cid vc;
 
-      rv = ngtcp2_pkt_decode_version_cid(&version, &dcid, &dcidlen, &scid,
-                                         &scidlen, data, datalen,
-                                         SHRPX_QUIC_SCIDLEN);
+      rv =
+          ngtcp2_pkt_decode_version_cid(&vc, data, datalen, SHRPX_QUIC_SCIDLEN);
       if (rv != 0) {
         return -1;
       }
@@ -1787,11 +1775,11 @@ int Http3Upstream::on_read(const UpstreamAddr *faddr,
       if (worker->get_graceful_shutdown()) {
         ngtcp2_cid ini_dcid, ini_scid;
 
-        ngtcp2_cid_init(&ini_dcid, dcid, dcidlen);
-        ngtcp2_cid_init(&ini_scid, scid, scidlen);
+        ngtcp2_cid_init(&ini_dcid, vc.dcid, vc.dcidlen);
+        ngtcp2_cid_init(&ini_scid, vc.scid, vc.scidlen);
 
         quic_conn_handler->send_connection_close(
-            faddr, version, ini_dcid, ini_scid, remote_addr, local_addr,
+            faddr, vc.version, ini_dcid, ini_scid, remote_addr, local_addr,
             NGTCP2_CONNECTION_REFUSED, datalen * 3);
 
         return -1;
@@ -1799,9 +1787,9 @@ int Http3Upstream::on_read(const UpstreamAddr *faddr,
 
       retry_close_ = true;
 
-      quic_conn_handler->send_retry(handler_->get_upstream_addr(), version,
-                                    dcid, dcidlen, scid, scidlen, remote_addr,
-                                    local_addr, datalen * 3);
+      quic_conn_handler->send_retry(handler_->get_upstream_addr(), vc.version,
+                                    vc.dcid, vc.dcidlen, vc.scid, vc.scidlen,
+                                    remote_addr, local_addr, datalen * 3);
 
       return -1;
     }

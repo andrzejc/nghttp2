@@ -36,8 +36,8 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get install \
-          g++-11 \
-          clang-12 \
+          g++-12 \
+          clang-14 \
           autoconf \
           automake \
           autotools-dev \
@@ -74,8 +74,8 @@ jobs:
     - name: Setup clang (Linux)
       if: runner.os == 'Linux' && matrix.compiler == 'clang'
       run: |
-        echo 'CC=clang-12' >> $GITHUB_ENV
-        echo 'CXX=clang++-12' >> $GITHUB_ENV
+        echo 'CC=clang-14' >> $GITHUB_ENV
+        echo 'CXX=clang++-14' >> $GITHUB_ENV
     - name: Setup clang (MacOS)
       if: runner.os == 'macOS' && matrix.compiler == 'clang'
       run: |
@@ -84,8 +84,8 @@ jobs:
     - name: Setup gcc (Linux)
       if: runner.os == 'Linux' && matrix.compiler == 'gcc'
       run: |
-        echo 'CC=gcc-11' >> $GITHUB_ENV
-        echo 'CXX=g++-11' >> $GITHUB_ENV
+        echo 'CC=gcc-12' >> $GITHUB_ENV
+        echo 'CXX=g++-12' >> $GITHUB_ENV
     - name: Setup gcc (MacOS)
       if: runner.os == 'macOS' && matrix.compiler == 'gcc'
       run: |
@@ -94,7 +94,7 @@ jobs:
     - name: Build libbpf
       if: matrix.http3 == 'http3' && matrix.compiler == 'clang' && runner.os == 'Linux'
       run: |
-        git clone -b v0.8.0 https://github.com/libbpf/libbpf
+        git clone -b v1.0.1 https://github.com/libbpf/libbpf
         cd libbpf
         PREFIX=$PWD/build make -C src install
 
@@ -106,7 +106,7 @@ jobs:
     - name: Build quictls/openssl v1.1.1
       if: matrix.http3 == 'http3' && matrix.openssl == 'openssl1'
       run: |
-        git clone --depth 1 -b OpenSSL_1_1_1q+quic https://github.com/quictls/openssl
+        git clone --depth 1 -b OpenSSL_1_1_1s+quic https://github.com/quictls/openssl
         cd openssl
         ./config --prefix=$PWD/build
         make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)"
@@ -117,7 +117,7 @@ jobs:
         unset CPPFLAGS
         unset LDFLAGS
 
-        git clone --depth 1 -b openssl-3.0.5+quic https://github.com/quictls/openssl
+        git clone --depth 1 -b openssl-3.0.7+quic https://github.com/quictls/openssl
         cd openssl
         ./config enable-ktls --prefix=$PWD/build --libdir=$PWD/build/lib
         make -j"$(nproc 2> /dev/null || sysctl -n hw.ncpu)"
@@ -127,7 +127,7 @@ jobs:
       run: |
         git clone https://boringssl.googlesource.com/boringssl
         cd boringssl
-        git checkout b95124305ab15c7523d3e21437309fa5dd717ee8
+        git checkout b2536a2c6234496ef609e7c909936bbf828dac6d
         mkdir build
         cd build
         cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON ..
@@ -148,7 +148,7 @@ jobs:
     - name: Build nghttp3
       if: matrix.http3 == 'http3'
       run: |
-        git clone --depth 1 -b v0.6.0 https://github.com/ngtcp2/nghttp3
+        git clone --depth 1 -b v0.7.1 https://github.com/ngtcp2/nghttp3
         cd nghttp3
         autoreconf -i
         ./configure --prefix=$PWD/build --enable-lib-only
@@ -157,7 +157,7 @@ jobs:
     - name: Build ngtcp2
       if: matrix.http3 == 'http3'
       run: |
-        git clone --depth 1 -b v0.7.0 https://github.com/ngtcp2/ngtcp2
+        git clone --depth 1 -b v0.11.0 https://github.com/ngtcp2/ngtcp2
         cd ngtcp2
         autoreconf -i
         ./configure --prefix=$PWD/build --enable-lib-only PKG_CONFIG_PATH="../openssl/build/lib/pkgconfig" $EXTRA_NGTCP2_OPTS
