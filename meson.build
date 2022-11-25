@@ -1,5 +1,5 @@
 project('nghttp2', 'c', 'cpp',
-  version: '1.48.90',
+  version: '1.51.90',
   meson_version: '>=0.58.0',
   license: 'MIT',
   default_options: [
