@@ -109,32 +109,18 @@ if windows
   if clang and gcc
     # XXX this is only necessary for clang, not clang-cl, which meson treats as msvc
     use_debug_crt = get_option('buildtype') == 'debug'
-    crt_opts_map = {
-      'md': ['-D_MT', '-D_DLL'],
-      'mdd': ['-D_MT', '-D_DLL', '-D_DEBUG'],
-      'mt': ['-D_MT'],
-      'mtd': ['-D_MT', '-D_DEBUG'],
-      'from_buildtype': ['-D_MT', '-D_DLL'] + (use_debug_crt ? ['-D_DEBUG'] : []),
-      'static_from_buildtype': ['-D_MT'] + (use_debug_crt ? ['-D_DEBUG'] : []),
-    }
-    crt_opts = crt_opts_map[get_option('clang_vscrt')]
-    add_project_arguments(
-      crt_opts + (
+    add_project_arguments([
+        '-fcolor-diagnostics',
+        '-fansi-escape-codes',
+        '-D_MT',
+      ] + (
+        use_debug_crt ? ['-D_DEBUG'] : []
+      ) + (
         get_option('debug') ? ['-Xclang', '-gcodeview'] : []
       ),
       language: ['c', 'cpp'],
     )
-    if crt_opts.contains('-D_DLL')
-      add_project_link_arguments(use_debug_crt ? [
-          '-Wl,-nodefaultlib:libcmtd',
-          '-lmsvcrtd',
-        ] : [
-          '-Wl,-nodefaultlib:libcmt',
-          '-lmsvcrt',
-        ],
-        language: ['c', 'cpp'],
-      )
-    elif use_debug_crt
+    if use_debug_crt
       add_project_link_arguments([
           '-Wl,-nodefaultlib:libcmt',
           '-llibcmtd',
@@ -146,8 +132,8 @@ if windows
       if get_option('b_lto')
         warning('Option b_lto is known to cause ASAN odr-violation false postitives! (-Db_lto=false)')
       endif
-      if crt_opts.contains('-D_DLL') or crt_opts.contains('-D_DEBUG')
-        error('Sanitizer-enabled builds must use static release CRT (-Dclang_vscrt=mt)')
+      if use_debug_crt
+        error('Sanitizer-enabled builds must use static release CRT')
       endif
       # XXX workaround meson failing to provide linker option -fsanitize=... when compiler is clang
       add_project_link_arguments('-fsanitize=' + get_option('b_sanitize'), language: ['c', 'cpp'])

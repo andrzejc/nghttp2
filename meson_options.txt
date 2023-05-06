@@ -1,10 +1,4 @@
-option('clang_vscrt', type: 'combo', choices: ['md', 'mdd', 'mt', 'mtd', 'from_buildtype', 'static_from_buildtype'], value: 'static_from_buildtype', description: 'same as b_vscrt but works for clang', yield: true)
-option('enable_debug_output', type: 'boolean', value: 'false', description: '')
+option('enable_debug_output', type: 'boolean', value: false, description: '')
 
 # XXX we need to list here all options that are set in our native/cross files to avoid meson error starting from ver 0.61
 option('enable_jemalloc', type: 'boolean', description: 'ignored in this project - present only to remove meson warnings', yield: true)
-option('CUDA_dir', type: 'string', description: 'ignored in this project - present only to remove meson warnings', yield: true)
-option('libtorch_dir', type: 'string', description: 'ignored in this project - present only to remove meson warnings', yield: true)
-option('rockey_lib_win', type: 'string', description: 'ignored in this project - present only to remove meson warnings', yield: true)
-option('rockey2_lib_win', type: 'string', description: 'ignored in this project - present only to remove meson warnings', yield: true)
-option('icu4c_dir', type: 'string', description: 'ignored in this project - present only to remove meson warnings', yield: true)
