@@ -46,7 +46,9 @@ nghttp2_asio_lib = library('nghttp2_asio', [
     url_parser_dep,
     llhttp_dep,
   ],
-  cpp_args: '-DHAVE_CONFIG_H',
+  cpp_args: ['-DHAVE_CONFIG_H'] + (
+    clang and cc_major > 18 ? ['-Wno-deprecated-literal-operator'] : []
+  ),
   c_args: '-DHAVE_CONFIG_H',
   include_directories: [
     config_include,

@@ -12,6 +12,7 @@ windows = host_machine.system() == 'windows'
 cc = meson.get_compiler('c')
 gcc = cc.get_argument_syntax() == 'gcc'
 clang = cc.get_id().contains('clang')
+cc_major = cc.version().split('.')[0].to_int()
 
 cdata = configuration_data()
 
