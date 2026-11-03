@@ -145,21 +145,9 @@ endif
 
 subdir('third-party')
 
-# libnghttp2 itself: upstream's release as it is, built with its own CMake, library only and static; the version is the
-# one the main project's subprojects/libnghttp2.wrap downloads (a newer release is a change of that file only)
-cmake = import('cmake')
-libnghttp2_options = cmake.subproject_options()
-libnghttp2_options.add_cmake_defines({
-  'ENABLE_LIB_ONLY': true,
-  'BUILD_SHARED_LIBS': false,
-  'BUILD_STATIC_LIBS': true,
-  'ENABLE_DOC': false,
-  'BUILD_TESTING': false,
-})
-libnghttp2_options.set_install(false)
-# upstream's code as upstream builds it: the compiler's default C dialect (POSIX clock_gettime), its warnings not errors
-libnghttp2_options.set_override_option('c_std', 'gnu11')
-libnghttp2_options.set_override_option('werror', 'false')
-nghttp2_dep = cmake.subproject('libnghttp2', options: libnghttp2_options).dependency('nghttp2_static')
+# libnghttp2 itself: upstream's release as it is, built with Meson by the overlay the main project's
+# subprojects/libnghttp2.wrap carries (library only, static); the version is the one that wrap downloads, never a
+# system libnghttp2 (hence no dependency() lookup)
+nghttp2_dep = subproject('libnghttp2').get_variable('libnghttp2_dep')
 
 subdir('src')
