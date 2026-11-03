@@ -101,12 +101,10 @@ public:
   boost::system::error_code on_read(const boost::array<uint8_t, N> &buffer, std::size_t len) {
     callback_guard cg(*this);
 
-    int rv;
-
-    rv = nghttp2_session_mem_recv(session_, buffer.data(), len);
+    auto rv = nghttp2_session_mem_recv2(session_, buffer.data(), len);
 
     if (rv < 0) {
-      return boost::system::error_code(rv, nghttp2_category());
+      return boost::system::error_code(static_cast<int>(rv), nghttp2_category());
     }
 
     return {};
@@ -129,7 +127,7 @@ public:
 
     for (;;) {
       const uint8_t *data;
-      auto nread = nghttp2_session_mem_send(session_, &data);
+      auto nread = nghttp2_session_mem_send2(session_, &data);
       if (nread < 0) {
         return boost::system::error_code(nread, nghttp2_category());
       }
