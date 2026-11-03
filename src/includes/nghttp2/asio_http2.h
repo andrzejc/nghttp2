@@ -36,6 +36,13 @@
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 
+/* Our API (generator_cb) returns ssize_t, which MSVC lacks. Only ours: we call libnghttp2 through its nghttp2_ssize API,
+   since its ssize_t one depends on how the library was built (upstream's CMake makes it int on MSVC). */
+#if defined(_MSC_VER) && !defined(ssize_t)
+#  include <stddef.h>
+typedef ptrdiff_t ssize_t;
+#endif
+
 #include <nghttp2/nghttp2.h>
 
 namespace nghttp2 {

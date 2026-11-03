@@ -543,8 +543,8 @@ const request *session_impl::submit(boost::system::error_code &ec,
 
   req.header(std::move(h));
 
-  nghttp2_data_provider *prdptr = nullptr;
-  nghttp2_data_provider prd;
+  nghttp2_data_provider2 *prdptr = nullptr;
+  nghttp2_data_provider2 prd;
 
   if (cb) {
     strm->request().impl().on_read(std::move(cb));
@@ -552,14 +552,14 @@ const request *session_impl::submit(boost::system::error_code &ec,
     prd.read_callback = [](nghttp2_session *session, int32_t stream_id,
                            uint8_t *buf, size_t length, uint32_t *data_flags,
                            nghttp2_data_source *source,
-                           void *user_data) -> ssize_t {
+                           void *user_data) -> nghttp2_ssize {
       auto strm = static_cast<stream *>(source->ptr);
       return strm->request().impl().call_on_read(buf, length, data_flags);
     };
     prdptr = &prd;
   }
 
-  auto stream_id = nghttp2_submit_request(session_, prio.get(), nva.data(),
+  auto stream_id = nghttp2_submit_request2(session_, prio.get(), nva.data(),
                                           nva.size(), prdptr, strm.get());
   if (stream_id < 0) {
     ec = make_error_code(static_cast<nghttp2_error>(stream_id));
@@ -639,10 +639,10 @@ void session_impl::do_read() {
     {
       callback_guard cg(*self);
 
-      auto rv = nghttp2_session_mem_recv(self->session_, self->rb_.data(),
+      auto rv = nghttp2_session_mem_recv2(self->session_, self->rb_.data(),
                                          bytes_transferred);
 
-      if (rv != static_cast<ssize_t>(bytes_transferred)) {
+      if (rv != static_cast<nghttp2_ssize>(bytes_transferred)) {
         self->call_error_cb(make_error_code(
             static_cast<nghttp2_error>(rv < 0 ? rv : NGHTTP2_ERR_PROTO)));
         self->stop();
@@ -684,7 +684,7 @@ void session_impl::do_write() {
 
     for (;;) {
       const uint8_t *data;
-      auto n = nghttp2_session_mem_send(session_, &data);
+      auto n = nghttp2_session_mem_send2(session_, &data);
       if (n < 0) {
         call_error_cb(make_error_code(static_cast<nghttp2_error>(n)));
         stop();

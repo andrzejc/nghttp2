@@ -103,7 +103,7 @@ public:
 
     int rv;
 
-    rv = nghttp2_session_mem_recv(session_, buffer.data(), len);
+    rv = nghttp2_session_mem_recv2(session_, buffer.data(), len);
 
     if (rv < 0) {
       return boost::system::error_code(rv, nghttp2_category());
@@ -129,7 +129,7 @@ public:
 
     for (;;) {
       const uint8_t *data;
-      auto nread = nghttp2_session_mem_send(session_, &data);
+      auto nread = nghttp2_session_mem_send2(session_, &data);
       if (nread < 0) {
         return boost::system::error_code(nread, nghttp2_category());
       }
